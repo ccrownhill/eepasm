@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
 		} else if (opcode == "RET") {
 			iword = 0b1100111100000000;
 		} else if (opcode == "EXT") {
-			iword = 0b11010000;
+			iword = 0b1101000000000000;
 			iword += imm_parse(operands, 0xff); // 8 bit mask
 		} else {
 			error("Unknown instruction");
