@@ -1,4 +1,5 @@
 .vscode
 main
+configurable
 *.txt
 *.ram
