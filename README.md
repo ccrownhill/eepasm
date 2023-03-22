@@ -1,4 +1,10 @@
-# EEP1 assembler
+# Extendable EEP1 assembler
+
+An assembler for EEP0 and EEP1 CPU as taught at Imperial College 2022.
+
+This is an alternative version of [Tom Clarke's EEP1 assembler](https://github.com/tomcl/eepAssembler) with one major advantage:
+
+**new custom instructions can be added via a configuration file** `inslist.eepc` **without needing to change the code**.
 
 ## Compilation
 
