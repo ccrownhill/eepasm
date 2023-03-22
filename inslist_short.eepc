@@ -14,36 +14,10 @@ MOV
 		type	imm
 		size	8
 		lsb	0
-		ins8	1
-	numops	2
-	op
-		type	flags
-		const	0b11100
-	op
-		type	reg
-		lsb	9
-	numops	2
-	op
-		type	reg
-		lsb	9
-	op
-		type	flags
-		const	0b1011100
-	numops	2
-	op
-		type	pcx
-		const	0b111100
-	op
-		type	reg
-		lsb	9
-	numops	2
-	op
-		type	reg
-		lsb	9
-	op
-		type	pcx
-		const	0b1111100
 	const_iword	0
+CMP
+	copy
+	const_iword	0b0110000000000000
 ADD
 	numops	2
 	op
@@ -53,7 +27,6 @@ ADD
 		type	imm
 		size	8
 		lsb	0
-		ins8	1
 	numops	3
 	op
 		type	reg
@@ -77,24 +50,7 @@ SBC
 AND
 	copy	
 	const_iword	0b0101000000000000
-CMP
-	numops	2
-	op
-		type	reg
-		lsb	9
-	op
-		type	reg
-		lsb	5
-	numops 2
-	op
-		type	reg
-		lsb	9
-	op
-		type	imm
-		size	8
-		lsb	0
-		ins8	1
-	const_iword	0b0110000000000000
+
 
 LSL
 	numops	3
@@ -108,7 +64,6 @@ LSL
 		type	imm
 		size	4
 		lsb	0
-		ins8	0
 	const_iword	0b0111000000000000
 LSR
 	copy
@@ -117,7 +72,7 @@ ASR
 	copy
 	const_iword	0b0111000100000000
 XSR
-	copy
+
 	const_iword	0b0111000100010000
 LDR
 	numops	2
@@ -135,7 +90,6 @@ LDR
 		type	imm
 		size	8
 		lsb	0
-		ins8	1
 	numops	3
 	op
 		type	reg
@@ -147,7 +101,6 @@ LDR
 		type	imm
 		size	5
 		lsb	0
-		ins8	0
 	const_iword	0b1000000000000000
 STR
 	copy
@@ -161,10 +114,11 @@ JMP
 		type	imm
 		size	8
 		lsb	0
-		ins8	0
 	numops	1
 	op
 		type	label
+		size	8
+		lsb	0
 	const_iword	0b1100000000000000
 NOOP
 	copy
@@ -216,11 +170,4 @@ EXT
 		type	imm
 		size	8
 		lsb	0
-		ins8	0
-	const_iword	0b1101000000000000
-RETINT
-	const_iword	0x18
-SETI
-	const_iword	0x38
-CLRI
-	const_iword	0x58
+	const_iword 0b1101000000000000

@@ -15,34 +15,6 @@ MOV
 		size	8
 		lsb	0
 		ins8	1
-	numops	2
-	op
-		type	flags
-		const	0b11100
-	op
-		type	reg
-		lsb	9
-	numops	2
-	op
-		type	reg
-		lsb	9
-	op
-		type	flags
-		const	0b1011100
-	numops	2
-	op
-		type	pcx
-		const	0b111100
-	op
-		type	reg
-		lsb	9
-	numops	2
-	op
-		type	reg
-		lsb	9
-	op
-		type	pcx
-		const	0b1111100
 	const_iword	0
 ADD
 	numops	2
@@ -217,10 +189,4 @@ EXT
 		size	8
 		lsb	0
 		ins8	0
-	const_iword	0b1101000000000000
-RETINT
-	const_iword	0x18
-SETI
-	const_iword	0x38
-CLRI
-	const_iword	0x58
+	const_iword 0b1101000000000000

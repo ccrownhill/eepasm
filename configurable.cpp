@@ -84,73 +84,77 @@ int main(int argc, char *argv[]) {
 
 		ins_alts = insmap[tokens[0]].first;
 		iword = insmap[tokens[0]].second;
+		if (ins_alts.size() != 0) {
 
-		int imm_size;
-		int numops;
-		int alt_idx = 0;
-		// skip to first instruction alternative with correct number
-		// of operands
-		while (ins_alts[alt_idx].size() != tokens.size() - 1) {
-			alt_idx++;
-			if (alt_idx >= ins_alts.size())
-				error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
-		}
-		// select first alternative with matching number of operands
-		if (ins_alts[alt_idx].size() == tokens.size() - 1) {
+			int imm_size;
+			int numops;
+			int alt_idx = 0;
+			// skip to first instruction alternative with correct number
+			// of operands
+			while (ins_alts[alt_idx].size() != tokens.size() - 1) {
+				alt_idx++;
+				if (alt_idx >= ins_alts.size())
+					error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
+			}
+			// select first alternative with matching number of operands
+			if (ins_alts[alt_idx].size() == tokens.size() - 1) {
 
-			// these indexes can differ if a 2 operand shorthand
-			// of a 3 operand instruction is encountered:
-			// index of operand in current alternative
-			int alt_op = 0;
-			// index of operand in current tokens vector
-			int tok_op = 1; // starts at first operand in token vector
-			// needed to skip already processed Ra if we go back
-			// by one operand for Rc of 3 operand instruction
-			// with 2 operand shorthand
-			bool alt_op_skip = false;
-			for (; tok_op < tokens.size(); tok_op++, alt_op++) {
-				// go to next alternative if current operand does not match requirement
-				while (!optype_equal(tokens[tok_op], ins_alts[alt_idx][alt_op]["type"])) {
-					alt_idx++;
-					if (alt_idx >= ins_alts.size())
-						error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
-					if (ins_alts[alt_idx].size() > tokens.size() - 1) {
-						// try 3 operand instruction by duplicating first operand
-						if (ins_alts[alt_idx].size() == tokens.size()) {
-							tok_op--;
-							alt_op = tok_op - 1;
-							alt_op_skip = true;
-							if (tok_op == 0)
-								error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
-						} else {
+				// these indexes can differ if a 2 operand shorthand
+				// of a 3 operand instruction is encountered:
+				// index of operand in current alternative
+				int alt_op = 0;
+				// index of operand in current tokens vector
+				int tok_op = 1; // starts at first operand in token vector
+				// needed to skip already processed Ra if we go back
+				// by one operand for Rc of 3 operand instruction
+				// with 2 operand shorthand
+				bool alt_op_skip = false;
+				for (; tok_op < tokens.size(); tok_op++, alt_op++) {
+					// go to next alternative if current operand does not match requirement
+					while (!optype_equal(tokens[tok_op], ins_alts[alt_idx][alt_op]["type"])) {
+						alt_idx++;
+						if (alt_idx >= ins_alts.size()) {
 							error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
 						}
+						if (ins_alts[alt_idx].size() > tokens.size() - 1) {
+							// try 3 operand instruction by duplicating first operand
+							if (ins_alts[alt_idx].size() == tokens.size()) {
+								tok_op--;
+								alt_op = tok_op - 1;
+								alt_op_skip = true;
+								if (tok_op == 0) {
+									error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
+								}
+							} else {
+								error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
+							}
+						}
+					}
+
+
+					// TODO make these functions that just accept the operand map as their parameters
+					// need to distinguish these cases because register operands have fixed size
+					if (ins_alts[alt_idx][alt_op]["type"] == "reg") {
+						iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], regsize, pc)
+							<< num_parse(ins_alts[alt_idx][alt_op]["lsb"]);
+					} else if (ins_alts[alt_idx][alt_op]["type"] == "imm") {
+						imm_size = num_parse(ins_alts[alt_idx][alt_op]["size"]);
+						iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], imm_size, pc)
+							<< num_parse(ins_alts[alt_idx][alt_op]["lsb"]);
+						iword += num_parse(ins_alts[alt_idx][alt_op]["ins8"]) << 8;
+					} else if (ins_alts[alt_idx][alt_op]["type"] == "label") {
+						iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], offset_size, pc);
+					} else if (ins_alts[alt_idx][alt_op]["type"] == "flags" || ins_alts[alt_idx][alt_op]["type"] == "pcx") {
+						iword += num_parse(ins_alts[alt_idx][alt_op]["const"]);
+					}
+					if (alt_op_skip) {
+						alt_op++;
+						alt_op_skip = false;
 					}
 				}
-
-
-				// TODO make these functions that just accept the operand map as their parameters
-				// need to distinguish these cases because register operands have fixed size
-				if (ins_alts[alt_idx][alt_op]["type"] == "reg") {
-					iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], regsize, pc)
-						<< num_parse(ins_alts[alt_idx][alt_op]["lsb"]);
-				} else if (ins_alts[alt_idx][alt_op]["type"] == "imm") {
-					imm_size = num_parse(ins_alts[alt_idx][alt_op]["size"]);
-					iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], imm_size, pc)
-						<< num_parse(ins_alts[alt_idx][alt_op]["lsb"]);
-					iword += num_parse(ins_alts[alt_idx][alt_op]["ins8"]) << 8;
-				} else if (ins_alts[alt_idx][alt_op]["type"] == "label") {
-					iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], offset_size, pc);
-				} else if (ins_alts[alt_idx][alt_op]["type"] == "flags" || ins_alts[alt_idx][alt_op]["type"] == "pcx") {
-					iword += num_parse(ins_alts[alt_idx][alt_op]["const"]);
-				}
-				if (alt_op_skip) {
-					alt_op++;
-					alt_op_skip = false;
-				}
+			} else {
+				error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
 			}
-		} else {
-			error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
 		}
 
 		outfile << ins2str(pc, iword) << "\n";
@@ -334,7 +338,7 @@ bool optype_equal(const std::string& op, const std::string& type) {
 		return (op[0] == 'r');
 	} else if (type == "imm") {
 		// last case to also make it work for negative numbers
-		return ((op[0] > '0' && op[0] < '9') || op[0] == '-');
+		return ((op[0] >= '0' && op[0] <= '9') || op[0] == '-');
 	} else if (type == "label") {
 		return true;
 	} else if (type == "pcx") {

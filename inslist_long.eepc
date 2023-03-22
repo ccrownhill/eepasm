@@ -1,0 +1,431 @@
+MOV
+	numops	2
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	numops 2
+	op
+		type	reg
+		lsb	9
+	op
+		type	imm
+		size	8
+		lsb	0
+	const_iword	0
+ADD
+	numops	2
+	op
+		type	reg
+		lsb 	9
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	3
+	op
+		type	reg
+		lsb	2
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	const_iword	0b0001000000000000
+SUB
+	numops	2
+	op
+		type	reg
+		lsb 	9
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	3
+	op
+		type	reg
+		lsb	2
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	const_iword	0b0010000000000000
+ADC
+	numops	2
+	op
+		type	reg
+		lsb 	9
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	3
+	op
+		type	reg
+		lsb	2
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	const_iword	0b0011000000000000
+SBC
+	numops	2
+	op
+		type	reg
+		lsb 	9
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	3
+	op
+		type	reg
+		lsb	2
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	const_iword	0b0100000000000000
+AND
+	numops	2
+	op
+		type	reg
+		lsb 	9
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	3
+	op
+		type	reg
+		lsb	2
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	const_iword	0b0101000000000000
+CMP
+	numops	2
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	numops 2
+	op
+		type	reg
+		lsb	9
+	op
+		type	imm
+		size	8
+		lsb	0
+	const_iword	0b0110000000000000
+LSL
+	numops	3
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	op
+		type	imm
+		size	4
+		lsb	0
+	const_iword	0b0111000000000000
+LSR
+	numops	3
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	op
+		type	imm
+		size	4
+		lsb	0
+	const_iword	0b0111000000010000
+ASR
+	numops	3
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	op
+		type	imm
+		size	4
+		lsb	0
+	const_iword	0b0111000100000000
+XSR
+	numops	3
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	op
+		type	imm
+		size	4
+		lsb	0
+	const_iword	0b0111000100010000
+LDR
+	numops	2
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	numops	2
+	op
+		type	reg
+		lsb	9
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	3
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	op
+		type	imm
+		size	5
+		lsb	0
+	const_iword	0b1000000000000000
+STR
+	numops	2
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	numops	2
+	op
+		type	reg
+		lsb	9
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	3
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	op
+		type	imm
+		size	5
+		lsb	0
+	const_iword	0b1010000000000000
+JMP
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100000000000000
+NOOP
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100000100000000
+JEQ
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100001000000000
+JNE
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100001100000000
+JCS
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100010000000000
+JCC
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100010100000000
+JMI
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100011000000000
+JPL
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100011100000000
+JGE
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100100000000000
+JLT
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100100100000000
+JGT
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100101000000000
+JLE
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100101100000000
+JHI
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100110000000000
+JLS
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100110100000000
+JSR
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	numops	1
+	op
+		type	label
+		size	8
+		lsb	0
+	const_iword	0b1100111000000000
+RET
+	const_iword	0b1100111100000000
+EXT
+	numops	1
+	op
+		type	imm
+		size	8
+		lsb	0
+	const_iword 0b1101000000000000
