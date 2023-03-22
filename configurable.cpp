@@ -7,8 +7,8 @@
 #include <functional> // for function objects
 #include <vector>
 #include <utility> // for pair
+#include <algorithm> // for transform
 
-// TODO can you use using in header files
 using oplist_t = std::vector<std::unordered_map<std::string, std::string>>;
 using insmap_t = std::unordered_map<std::string, std::pair<std::vector<oplist_t>, uint16_t>>;
 using labelmap_t = std::unordered_map<std::string, int>;
@@ -16,10 +16,15 @@ using tokvec_t = std::vector<std::vector<std::string>>;
 
 constexpr char insfile[] = "inslist.eepc";
 constexpr int regsize = 3;
+constexpr int offset_size = 8;
 
 std::pair<int, int> test;
 
+
 void error(const std::string& msg);
+void parsing_error(const std::string& msg, const std::string& insname);
+void assem_error(const std::string& msg, const std::string& insname, int line);
+std::string get_low_str(std::istream& infile);
 void line_strip(std::string& line);
 std::pair<tokvec_t, labelmap_t> tokenize_file(std::ifstream& infile, const insmap_t& insmap);
 std::string ins2str(int pc, uint16_t iword);
@@ -35,14 +40,14 @@ uint16_t no_parse(const std::string& op, int size, int pc);
 
 
 insmap_t insmap_gen(const std::string& conf_file);
-oplist_t opvec_gen(std::istream& cfile, int numops);
+oplist_t opvec_gen(std::ifstream& cfile, int numops);
 
 std::unordered_map<std::string, std::function<uint16_t(const std::string&, int, int)>> optype_fns {
 	{"reg", reg_parse},
 	{"imm", imm_parse},
 	{"label", label_parse},
-	{"PCX", no_parse},
-	{"Flags", no_parse},
+	{"pcx", no_parse},
+	{"flags", no_parse},
 };
 
 std::unordered_map<std::string, int> label_map;
@@ -66,46 +71,87 @@ int main(int argc, char *argv[]) {
 
 
 	int pc = 0, iword;
+	int line = 0;
 	std::vector<oplist_t> ins_alts;
 	for (const auto& tokens : tok_vec) {
+		line++;
+		if (tokens[0] == "org") {
+			pc = num_parse(tokens[1]);
+			continue;
+		} else if (insmap.find(tokens[0]) == insmap.end()) {
+			error("line " + std::to_string(line) + ": unknown instruction '" + tokens[0] + "'");
+		}
+
 		ins_alts = insmap[tokens[0]].first;
 		iword = insmap[tokens[0]].second;
-		bool alt_found = false;
 
 		int imm_size;
+		int numops;
 		int alt_idx = 0;
 		// skip to first instruction alternative with correct number
 		// of operands
 		while (ins_alts[alt_idx].size() != tokens.size() - 1) {
 			alt_idx++;
 			if (alt_idx >= ins_alts.size())
-				error("assembly: no matching verions of instruction found");
+				error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
 		}
 		// select first alternative with matching number of operands
 		if (ins_alts[alt_idx].size() == tokens.size() - 1) {
-			alt_found = true;
-			for (int j = 0; j < ins_alts[alt_idx].size(); j++) {
+
+			// these indexes can differ if a 2 operand shorthand
+			// of a 3 operand instruction is encountered:
+			// index of operand in current alternative
+			int alt_op = 0;
+			// index of operand in current tokens vector
+			int tok_op = 1; // starts at first operand in token vector
+			// needed to skip already processed Ra if we go back
+			// by one operand for Rc of 3 operand instruction
+			// with 2 operand shorthand
+			bool alt_op_skip = false;
+			for (; tok_op < tokens.size(); tok_op++, alt_op++) {
 				// go to next alternative if current operand does not match requirement
-				while (!optype_equal(tokens[1+j], ins_alts[alt_idx][j]["type"])) {
+				while (!optype_equal(tokens[tok_op], ins_alts[alt_idx][alt_op]["type"])) {
 					alt_idx++;
-					if (alt_idx >= ins_alts.size() || ins_alts[alt_idx].size() != tokens.size() - 1)
-						error("assembly: no matching version of instruction found");
-
-				}
-
-				if (ins_alts[alt_idx][j]["type"] == "reg") {
-					iword += optype_fns[ins_alts[alt_idx][j]["type"]](tokens[1+j], regsize, pc) << num_parse(ins_alts[alt_idx][j]["lsb"]);
-				} else {
-					imm_size = num_parse(ins_alts[alt_idx][j]["size"]);
-					iword += optype_fns[ins_alts[alt_idx][j]["type"]](tokens[1+j], imm_size, pc) << num_parse(ins_alts[alt_idx][j]["lsb"]);
-					if (imm_size == 8) { // need to set bit 8
-						iword += 1 << 8;
+					if (alt_idx >= ins_alts.size())
+						error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
+					if (ins_alts[alt_idx].size() > tokens.size() - 1) {
+						// try 3 operand instruction by duplicating first operand
+						if (ins_alts[alt_idx].size() == tokens.size()) {
+							tok_op--;
+							alt_op = tok_op - 1;
+							alt_op_skip = true;
+							if (tok_op == 0)
+								error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
+						} else {
+							error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
+						}
 					}
 				}
+
+
+				// TODO make these functions that just accept the operand map as their parameters
+				// need to distinguish these cases because register operands have fixed size
+				if (ins_alts[alt_idx][alt_op]["type"] == "reg") {
+					iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], regsize, pc)
+						<< num_parse(ins_alts[alt_idx][alt_op]["lsb"]);
+				} else if (ins_alts[alt_idx][alt_op]["type"] == "imm") {
+					imm_size = num_parse(ins_alts[alt_idx][alt_op]["size"]);
+					iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], imm_size, pc)
+						<< num_parse(ins_alts[alt_idx][alt_op]["lsb"]);
+					iword += num_parse(ins_alts[alt_idx][alt_op]["ins8"]) << 8;
+				} else if (ins_alts[alt_idx][alt_op]["type"] == "label") {
+					iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], offset_size, pc);
+				} else if (ins_alts[alt_idx][alt_op]["type"] == "flags" || ins_alts[alt_idx][alt_op]["type"] == "pcx") {
+					iword += num_parse(ins_alts[alt_idx][alt_op]["const"]);
+				}
+				if (alt_op_skip) {
+					alt_op++;
+					alt_op_skip = false;
+				}
 			}
+		} else {
+			error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
 		}
-		if (!alt_found)
-			error("assembly: no matching version of instruction found");
 
 		outfile << ins2str(pc, iword) << "\n";
 		pc++;
@@ -118,6 +164,24 @@ void error(const std::string& msg) {
 	std::exit(EXIT_FAILURE);
 }
 
+void parsing_error(const std::string& msg, const std::string& insname) {
+	std::cerr << "Parsing (instruction: " << insname << "): " << msg << std::endl;
+	std::exit(EXIT_FAILURE);
+}
+
+void assem_error(const std::string& msg, const std::string& insname, int line) {
+	std::cerr << "Assemble line " << line << " (instruction: " << insname << "): " << msg << std::endl;
+	std::exit(EXIT_FAILURE);
+}
+
+// needs to have std::istream and not ifstream to work for string streams too
+std::string get_low_str(std::istream& infile) {
+	std::string out;
+	infile >> out;
+	std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) { return std::tolower(c); });
+	return out;
+}
+
 
 insmap_t insmap_gen(const std::string& conf_file) {
 	std::ifstream cfile {conf_file};
@@ -128,59 +192,91 @@ insmap_t insmap_gen(const std::string& conf_file) {
 	std::vector<oplist_t> alternatives_vec;
 	std::string ins_name, instr;
 	int numops;
-	uint16_t const_iword;
-	while (cfile >> ins_name) {
+	int line = 0;
+	while ((ins_name = get_low_str(cfile)) != "") {
 		// process instructions stored in instr
-		alternatives_vec.clear();
-		
-		while (cfile >> instr && instr == "numops") {
-			cfile >> numops; // numops value
-			alternatives_vec.push_back(opvec_gen(cfile, numops));
+	
+		instr = get_low_str(cfile);
+		if (instr == "copy") {
+			outmap[ins_name].first = alternatives_vec;
+			instr = get_low_str(cfile);
+		} else if (instr == "numops") {
+			alternatives_vec.clear();
+			while (instr == "numops") {
+				cfile >> numops; // numops value
+				if (numops > 3)
+					parsing_error("can't have more than 3 operands", ins_name);
+				alternatives_vec.push_back(opvec_gen(cfile, numops));
+				instr = get_low_str(cfile);
+			}
+			outmap[ins_name].first = alternatives_vec;
 		}
-		outmap[ins_name].first = alternatives_vec;
 
 		// while already read string const_iword
 		if (instr != "const_iword")
-			error("parsing: missing const_iword field");
-		cfile >> instr; // string of const_iword
+			parsing_error("missing const_iword field", ins_name);
+		instr = get_low_str(cfile); // string of const_iword
 		outmap[ins_name].second = num_parse(instr);
 	}
 
 	return outmap;
 }
 
-oplist_t opvec_gen(std::istream& cfile, int numops) {
+// TODO opvec gen function for different types
+oplist_t opvec_gen(std::ifstream& cfile, int numops) {
 	oplist_t outvec;
 	std::unordered_map<std::string, std::string> opfield_map;
-	std::string instr;
+	std::string instr, type;
+	int cfile_pos;
 	for (int i = 0; i < numops; i++) {
-		cfile >> instr;
+		instr = get_low_str(cfile);
 		if (instr != "op")
 			error("parsing: missing op indicator");
 
-		cfile >> instr;
+		instr = get_low_str(cfile);
 		if (instr != "type")
 			error("parsing: type field missing");
 
-		cfile >> instr; // set to type value
-		if (optype_fns.find(instr) == optype_fns.end())
+		type = get_low_str(cfile);
+		if (optype_fns.find(type) == optype_fns.end())
 			error("parsing: invaid operand type");
-		opfield_map["type"] = instr;
+		opfield_map["type"] = type;
 		
-		if (instr != "reg") { // need size field
-			cfile >> instr;
+		if (type == "imm") { // need size field
+			instr = get_low_str(cfile);
 			if (instr != "size")
 				error("parsing: size field missing");
 
-			cfile >> instr; // set to size value
+			instr = get_low_str(cfile);
 			opfield_map["size"] = instr;
 		}
 
-		cfile >> instr;
-		if (instr != "lsb")
-			error("parsing: lsb field missing");
-		cfile >> instr; // set to lsb value
-		opfield_map["lsb"] = instr;
+		if (type == "imm" || type == "reg") {
+			instr = get_low_str(cfile);
+			if (instr != "lsb")
+				error("parsing: lsb field missing");
+			instr = get_low_str(cfile);
+			opfield_map["lsb"] = instr;	
+		}
+
+		if (type == "imm") {
+			instr = get_low_str(cfile);
+			if (instr != "ins8")
+				error("parsing: ins8 field missing");
+			instr = get_low_str(cfile);
+			if (!(instr == "0" || instr == "1"))
+				error("parsing: ins8 value must be 0 or 1");
+			opfield_map["ins8"] = instr;
+		}
+
+		if (type == "flags" || type == "pcx") {
+			instr = get_low_str(cfile);
+			if (instr != "const")
+				error("parsing: const field required");
+			instr = get_low_str(cfile);
+			opfield_map["const"] = instr;
+		}
+
 		outvec.push_back(opfield_map);
 	}
 	return outvec;
@@ -195,29 +291,38 @@ std::pair<tokvec_t, labelmap_t> tokenize_file(std::ifstream& infile, const insma
 	std::vector<std::string> token_vec;
 	int pc = 0;
 	while (getline(infile, line)) {
+		line_strip(line);
 		if (line == "")
 			continue;
-		line_strip(line);
 		line_stream.clear(); // clear state flags
 		line_stream.str(line);
 		token_vec.clear();
 
-		line_stream >> token;
-		if (insmap.find(token) == insmap.end()) {
+		token = get_low_str(line_stream);
+		if (insmap.find(token) == insmap.end() && token != "org") {
 			label_map[token] = pc;
-			if (line_stream.str() == token) // if label on separate line
-				continue; // need to skip incrementingpc
+			std::string lower_stream_str = line_stream.str();
+			transform(lower_stream_str.begin(), lower_stream_str.end(), lower_stream_str.begin(), [](char c) { return tolower(c); });
+			if (lower_stream_str == token) { // if label on separate line
+				continue; // need to skip incrementing pc
+			}
 		} else {
 			token_vec.push_back(token);
 		}
-		pc++;
-			
-		while (line_stream >> token) {
-			while (token[0] == '#' || token [0] == '[')
-				token = token.replace(0, 1, "");
-			if (token[token.size()-1] == ',' || token[token.size()-1] == ']')
-				token = token.replace(token.size()-1, token.size(), "");
+		if (token == "org") {
+			token = get_low_str(line_stream);
+			pc = num_parse(token);
 			token_vec.push_back(token);
+		} else {
+			pc++;
+				
+			while ((token = get_low_str(line_stream)) != "") {
+				while (token[0] == '#' || token [0] == '[')
+					token = token.replace(0, 1, "");
+				if (token[token.size()-1] == ',' || token[token.size()-1] == ']')
+					token = token.replace(token.size()-1, token.size(), "");
+				token_vec.push_back(token);
+			}
 		}
 		outvec.push_back(token_vec);
 	}
@@ -226,16 +331,16 @@ std::pair<tokvec_t, labelmap_t> tokenize_file(std::ifstream& infile, const insma
 
 bool optype_equal(const std::string& op, const std::string& type) {
 	if (type == "reg") {
-		return (op[0] == 'R');
+		return (op[0] == 'r');
 	} else if (type == "imm") {
 		// last case to also make it work for negative numbers
 		return ((op[0] > '0' && op[0] < '9') || op[0] == '-');
 	} else if (type == "label") {
 		return true;
-	} else if (type == "PCX") {
-		return (op == "PCX");
-	} else if (type == "Flags") {
-		return (op == "Flags");
+	} else if (type == "pcx") {
+		return (op == "pcx");
+	} else if (type == "flags") {
+		return (op == "flags");
 	} else {
 		return false; // if unknown type
 	}
@@ -248,6 +353,8 @@ void line_strip(std::string& line) {
 
 	while (line[0] == '\t' || line[0] == ' ')
 		line = line.replace(0, 1, "");
+	while (line[line.size()-1] == '\t' || line[line.size()-1] == ' ')
+		line.resize(line.size()-1);
 }
 
 std::string ins2str(int pc, uint16_t iword) {
