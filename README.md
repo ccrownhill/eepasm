@@ -36,6 +36,8 @@ It must be in the same directory as your `eepasm` binary.
 
 The given default `inslist.eepc` just implements to main EEP1 ISA as specified [below](#specifcations-of-eep1-assembly-and-machine-code-encoding).
 
+DISCLAIMER: ALL CONFIGURATION KEYWORDS ARE CASE INSENSITIVE
+
 ### Top level format
 
 Basically you list instructions in the following kind of hierarchy (for one instruction):
@@ -83,6 +85,43 @@ ADD
 	const_iword	0b0001000000000000
 ```
 
+### `copy` to save retyping configurations
+
+If different instructions have the same alternatives of operand combinations you
+can just use the `copy` keyword instead of an alternatives list to copy the alternatives
+from the instruction right above.
+
+For example like this to make `ADD` and `SUB` have the same format:
+
+```
+ADD
+	numops	2
+	op
+		type	reg
+		lsb 	9
+	op
+		type	imm
+		size	8
+		lsb	0
+		ins8	1
+	numops	3
+	op
+		type	reg
+		lsb	2
+	op
+		type	reg
+		lsb	9
+	op
+		type	reg
+		lsb	5
+	const_iword	0b0001000000000000
+SUB
+	copy
+	const_iword	0b0010000000000000
+```
+
+**Note**: `const_iword` is always separate.
+
 ### Operand type properties
 
 `reg`:
@@ -119,6 +158,10 @@ Used for interrupts to save PCX (saved program counter) in register (e.g. `MOV R
 
 Used for interrupts to save flags in register (e.g. `MOV R0, Flags` and restore them (e.g. `MOV Flags, R0`).
 
+
+### Built-in 2 operand shortcuts for 3 operand instructions
+
+If only 2 operands are given the first one will be duplicated.
 
 ## Adding custom instructions
 
