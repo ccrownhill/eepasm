@@ -110,14 +110,14 @@ Used for JUMP instructions.
 * `type`: set to `pcx`
 * `const`: specifies a constant value that is added to the instruction word (this can be used to change the instruction depending on which operand of the instruction `pcx` is)
 
-Used for interrupts to save program counter in register (e.g. `MOV PCX, R0`) and restore it (e.g. `MOV R0, PCX`)
+Used for interrupts to save PCX (saved program counter) in register (e.g. `MOV R0, PCX`) and restore it (e.g. `MOV PCX, R0`)
 
 `flags`:
 
 * `type`: set to `flags`
 * `const`: same as for `pcx`
 
-Used for interrupts to save flags in register and restore them.
+Used for interrupts to save flags in register (e.g. `MOV R0, Flags` and restore them (e.g. `MOV Flags, R0`).
 
 
 ## Adding custom instructions
