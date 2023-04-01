@@ -26,6 +26,7 @@ void usage();
 void error(const std::string& msg);
 void parsing_error(const std::string& msg, const std::string& insname);
 void assem_error(const std::string& msg, const std::string& insname, int line);
+
 std::string get_low_str(std::istream& infile);
 std::string get_cfile_val(std::ifstream& cfile, const std::string& field_name);
 void line_strip(std::string& line);
@@ -39,14 +40,14 @@ uint16_t num_parse(const std::string& instr);
 uint16_t reg_parse(const std::string& reg_name, std::unordered_map<std::string, std::string> opfield_map, int pc);
 uint16_t imm_parse(const std::string& imm_op, std::unordered_map<std::string, std::string> opfield_map, int pc);
 uint16_t label_parse(const std::string& label, std::unordered_map<std::string, std::string> opfield_map, int pc);
-uint16_t no_parse(const std::string& op, std::unordered_map<std::string, std::string> opfield_map, int pc);
+uint16_t lit_parse(const std::string& op, std::unordered_map<std::string, std::string> opfield_map, int pc);
 
 
 insmap_t insmap_gen(const std::string& conf_file);
 oplist_t opvec_gen(std::ifstream& cfile, int numops);
 std::unordered_map<std::string, std::string> reg_opgen(std::ifstream& cfile);
 std::unordered_map<std::string, std::string> imm_opgen(std::ifstream& cfile);
-std::unordered_map<std::string, std::string> const_opgen(std::ifstream& cfile);
+std::unordered_map<std::string, std::string> lit_opgen(std::ifstream& cfile);
 std::unordered_map<std::string, std::string> no_opgen(std::ifstream& cfile);
 
 
@@ -54,16 +55,14 @@ std::unordered_map<std::string, std::function<std::unordered_map<std::string, st
 	{"reg", reg_opgen},
 	{"imm", imm_opgen},
 	{"label", no_opgen},
-	{"pcx", const_opgen},
-	{"flags", const_opgen},
+	{"lit", lit_opgen},
 };
 
 std::unordered_map<std::string, std::function<uint16_t(const std::string&, std::unordered_map<std::string, std::string>, int)>> optype_fns {
 	{"reg", reg_parse},
 	{"imm", imm_parse},
 	{"label", label_parse},
-	{"pcx", no_parse},
-	{"flags", no_parse},
+	{"lit", lit_parse},
 };
 
 std::unordered_map<std::string, int> label_map;
@@ -309,9 +308,10 @@ std::unordered_map<std::string, std::string> imm_opgen(std::ifstream& cfile) {
 	return opfield_map;
 }
 
-std::unordered_map<std::string, std::string> const_opgen(std::ifstream& cfile) {
+std::unordered_map<std::string, std::string> lit_opgen(std::ifstream& cfile) {
 	std::unordered_map<std::string, std::string>  opfield_map;
 
+	opfield_map["name"] = get_cfile_val(cfile, "name");
 	opfield_map["const"] = get_cfile_val(cfile, "const");
 
 	return opfield_map;
@@ -388,10 +388,9 @@ bool optype_equal(const std::string& op, const std::string& type) {
 		return ((op[0] >= '0' && op[0] <= '9') || op[0] == '-');
 	} else if (type == "label") {
 		return true;
-	} else if (type == "pcx") {
-		return (op == "pcx");
-	} else if (type == "flags") {
-		return (op == "flags");
+	} else if (type == "lit") {
+		return true; // could be any string
+			     // lit_parse will check whether it is the correct string
 	} else {
 		return false; // if unknown type
 	}
@@ -456,6 +455,6 @@ uint16_t label_parse(const std::string& label, std::unordered_map<std::string, s
 	return (label_map[label] - static_cast<uint16_t>(pc)) & 0xff;
 }
 
-uint16_t no_parse(const std::string& instr, std::unordered_map<std::string, std::string> opfield_map, int pc) {
-	return 0;
+uint16_t lit_parse(const std::string& label, std::unordered_map<std::string, std::string> opfield_map, int pc) {
+	return num_parse(opfield_map["const"]);
 }

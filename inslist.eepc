@@ -17,7 +17,8 @@ MOV
 		ins8	1
 	numops	2
 	op
-		type	flags
+		type	lit
+		name	flags
 		const	0b11100
 	op
 		type	reg
@@ -27,11 +28,13 @@ MOV
 		type	reg
 		lsb	9
 	op
-		type	flags
+		type	lit
+		name	flags
 		const	0b1011100
 	numops	2
 	op
-		type	pcx
+		type	lit
+		name	pcx
 		const	0b111100
 	op
 		type	reg
@@ -41,7 +44,8 @@ MOV
 		type	reg
 		lsb	9
 	op
-		type	pcx
+		type	lit
+		name	pcx
 		const	0b1111100
 	const_iword	0
 ADD
