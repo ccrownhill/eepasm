@@ -14,13 +14,15 @@ using insmap_t = std::unordered_map<std::string, std::pair<std::vector<oplist_t>
 using labelmap_t = std::unordered_map<std::string, int>;
 using tokvec_t = std::vector<std::vector<std::string>>;
 
-constexpr char insfile[] = "inslist.eepc";
+constexpr char def_insfile[] = "inslist.eepc";
+constexpr char def_outfile[] = "out.ram";
 constexpr int regsize = 3;
 constexpr int offset_size = 8;
 
 std::pair<int, int> test;
 
 
+void usage();
 void error(const std::string& msg);
 void parsing_error(const std::string& msg, const std::string& insname);
 void assem_error(const std::string& msg, const std::string& insname, int line);
@@ -53,21 +55,50 @@ std::unordered_map<std::string, std::function<uint16_t(const std::string&, int, 
 std::unordered_map<std::string, int> label_map;
 
 int main(int argc, char *argv[]) {
-	if (argc != 3)
-		error("Usage: eepasm infile outfile");
+
+	std::string insfile = def_insfile;
+	std::string outfile_name = def_outfile;
+	std::string infile_name = "";
+	// command line argument parsing
+	for (int i = 1; i < argc; i++) {
+		if (argv[i][0] == '-') {
+			if (argv[i][1] == 'o') {
+				if (i + 1 < argc) {
+					outfile_name = argv[++i];
+				} else {
+					usage();
+				}
+			} else if (argv[i][1] == 'c') {
+				if (i + 1 < argc) {
+					insfile = argv[++i];
+				} else {
+					usage();
+				}
+			} else {
+				std::cerr << "Unrecognized option " << argv[i] << std::endl;
+				usage();
+			}
+		} else {
+			infile_name = argv[i];
+		}
+	}
+
+	if (infile_name == "") {
+		usage();
+	}
 
 	insmap_t insmap = insmap_gen(insfile);
 
-	std::ifstream infile {argv[1]};
-	if (!infile)
-		error("can't open input file");
+	std::ifstream infile {infile_name};
+	if (!infile.is_open())
+		error("can't open input file '" + infile_name + "'");
 
 	auto [tok_vec, label_map] = tokenize_file(infile, insmap);
 	infile.close();
 
-	std::ofstream outfile {argv[2]};
-	if (!outfile)
-		error("can't open output file");
+	std::ofstream outfile {outfile_name};
+	if (!outfile.is_open())
+		error("can't open output file '" + outfile_name + "'");
 
 
 	int pc = 0, iword;
@@ -163,6 +194,11 @@ int main(int argc, char *argv[]) {
  	outfile.close();
 }
 
+void usage() {
+	std::cerr << "Usage: eepasm [-o outfile] [-c configfile] infile" << std::endl;
+	std::exit(EXIT_FAILURE);
+}
+
 void error(const std::string& msg) {
 	std::cerr << "Error: " << msg << std::endl;
 	std::exit(EXIT_FAILURE);
@@ -189,8 +225,8 @@ std::string get_low_str(std::istream& infile) {
 
 insmap_t insmap_gen(const std::string& conf_file) {
 	std::ifstream cfile {conf_file};
-	if (!cfile)
-		error("Can't open instruction list config file");
+	if (!cfile.is_open())
+		error("Can't open instruction list config file '" + conf_file + "'");
 
 	insmap_t outmap;
 	std::vector<oplist_t> alternatives_vec;

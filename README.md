@@ -4,7 +4,7 @@ An assembler for EEP0 and EEP1 CPU as taught at Imperial College 2022.
 
 This is an alternative version of [Tom Clarke's EEP1 assembler](https://github.com/tomcl/eepAssembler) with one major advantage:
 
-**new custom instructions can be added via a configuration file** `inslist.eepc` **without needing to change the code**.
+**new custom instructions can be added via a configuration file without the need to change the code**.
 
 ## Compilation
 
@@ -26,13 +26,18 @@ the same directory as the `eepasm` binary.
 Then run
 
 ```
-eepasm infile outfile
+eepasm [-o outfile] [-c configfile] infile
 ```
+
+* `-o` to set output machine code file (**default**: `out.ram`)
+* `-c` to set input configuration file with instruction list (**default**: `inslist.eepc`)
 
 ## Instruction definition configuration file format
 
-The ISA specification should go into the `inslist.eepc` file.
-It must be in the same directory as your `eepasm` binary.
+The ISA specification should go into a configuration file like `inslist.eepc`.
+By default `eepasm` will try to read the file `inslist.eepc` located in the same folder as the binary.
+
+You can override this by using the `-c` option (see [command usage](#command-usage)).
 
 The given default `inslist.eepc` just implements to main EEP1 ISA as specified [below](#specifcations-of-eep1-assembly-and-machine-code-encoding).
 

@@ -1,5 +1,4 @@
 .vscode
-main
-configurable
+eepasm
 *.txt
 *.ram
