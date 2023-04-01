@@ -27,6 +27,7 @@ void error(const std::string& msg);
 void parsing_error(const std::string& msg, const std::string& insname);
 void assem_error(const std::string& msg, const std::string& insname, int line);
 std::string get_low_str(std::istream& infile);
+std::string get_cfile_val(std::ifstream& cfile, const std::string& field_name);
 void line_strip(std::string& line);
 std::pair<tokvec_t, labelmap_t> tokenize_file(std::ifstream& infile, const insmap_t& insmap);
 std::string ins2str(int pc, uint16_t iword);
@@ -43,6 +44,19 @@ uint16_t no_parse(const std::string& op, int size, int pc);
 
 insmap_t insmap_gen(const std::string& conf_file);
 oplist_t opvec_gen(std::ifstream& cfile, int numops);
+std::unordered_map<std::string, std::string> reg_opgen(std::ifstream& cfile);
+std::unordered_map<std::string, std::string> imm_opgen(std::ifstream& cfile);
+std::unordered_map<std::string, std::string> const_opgen(std::ifstream& cfile);
+std::unordered_map<std::string, std::string> no_opgen(std::ifstream& cfile);
+
+
+std::unordered_map<std::string, std::function<std::unordered_map<std::string, std::string>(std::ifstream&)>> opvec_gen_fns {
+	{"reg", reg_opgen},
+	{"imm", imm_opgen},
+	{"label", no_opgen},
+	{"pcx", const_opgen},
+	{"flags", const_opgen},
+};
 
 std::unordered_map<std::string, std::function<uint16_t(const std::string&, int, int)>> optype_fns {
 	{"reg", reg_parse},
@@ -262,12 +276,12 @@ insmap_t insmap_gen(const std::string& conf_file) {
 	return outmap;
 }
 
-// TODO opvec gen function for different types
 oplist_t opvec_gen(std::ifstream& cfile, int numops) {
 	oplist_t outvec;
 	std::unordered_map<std::string, std::string> opfield_map;
 	std::string instr, type;
-	int cfile_pos;
+
+
 	for (int i = 0; i < numops; i++) {
 		instr = get_low_str(cfile);
 		if (instr != "op")
@@ -278,48 +292,59 @@ oplist_t opvec_gen(std::ifstream& cfile, int numops) {
 			error("parsing: type field missing");
 
 		type = get_low_str(cfile);
-		if (optype_fns.find(type) == optype_fns.end())
+		if (opvec_gen_fns.find(type) == opvec_gen_fns.end())
 			error("parsing: invaid operand type");
+
+		opfield_map = opvec_gen_fns[type](cfile);
 		opfield_map["type"] = type;
-		
-		if (type == "imm") { // need size field
-			instr = get_low_str(cfile);
-			if (instr != "size")
-				error("parsing: size field missing");
-
-			instr = get_low_str(cfile);
-			opfield_map["size"] = instr;
-		}
-
-		if (type == "imm" || type == "reg") {
-			instr = get_low_str(cfile);
-			if (instr != "lsb")
-				error("parsing: lsb field missing");
-			instr = get_low_str(cfile);
-			opfield_map["lsb"] = instr;	
-		}
-
-		if (type == "imm") {
-			instr = get_low_str(cfile);
-			if (instr != "ins8")
-				error("parsing: ins8 field missing");
-			instr = get_low_str(cfile);
-			if (!(instr == "0" || instr == "1"))
-				error("parsing: ins8 value must be 0 or 1");
-			opfield_map["ins8"] = instr;
-		}
-
-		if (type == "flags" || type == "pcx") {
-			instr = get_low_str(cfile);
-			if (instr != "const")
-				error("parsing: const field required");
-			instr = get_low_str(cfile);
-			opfield_map["const"] = instr;
-		}
-
+	
 		outvec.push_back(opfield_map);
 	}
 	return outvec;
+}
+
+std::unordered_map<std::string, std::string> reg_opgen(std::ifstream& cfile) {
+	std::unordered_map<std::string, std::string>  opfield_map;
+
+	opfield_map["lsb"] = get_cfile_val(cfile, "lsb");
+
+	return opfield_map;
+}
+
+std::unordered_map<std::string, std::string> imm_opgen(std::ifstream& cfile) {
+	std::unordered_map<std::string, std::string>  opfield_map;
+
+	opfield_map["size"] = get_cfile_val(cfile, "size");
+	opfield_map["lsb"] = get_cfile_val(cfile, "lsb");
+	opfield_map["ins8"] = get_cfile_val(cfile, "ins8");
+	if (!(opfield_map["ins8"] == "0" || opfield_map["ins8"] == "1"))
+		error("parsing: ins8 value must be 0 or 1");
+
+	return opfield_map;
+}
+
+std::unordered_map<std::string, std::string> const_opgen(std::ifstream& cfile) {
+	std::unordered_map<std::string, std::string>  opfield_map;
+
+	opfield_map["const"] = get_cfile_val(cfile, "const");
+
+	return opfield_map;
+}
+
+std::unordered_map<std::string, std::string> no_opgen(std::ifstream& cfile) {
+	std::unordered_map<std::string, std::string>  opfield_map {};
+
+	// empty opfield map
+
+	return opfield_map;
+}
+
+std::string get_cfile_val(std::ifstream& cfile, const std::string& field_name) {
+	std::string instr = get_low_str(cfile);
+	if (instr != field_name)
+		error("parsing: '" + field_name + "' field missing");
+	instr = get_low_str(cfile);
+	return instr;
 }
 
 std::pair<tokvec_t, labelmap_t> tokenize_file(std::ifstream& infile, const insmap_t& insmap) {
