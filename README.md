@@ -149,19 +149,19 @@ Inserts 8 bit offset value corresponding to given label.
 
 Used for JUMP instructions.
 
-`pcx`:
+`lit`: (literal)
 
-* `type`: set to `pcx`
-* `const`: specifies a constant value that is added to the instruction word (this can be used to change the instruction depending on which operand of the instruction `pcx` is)
+* `type`: set to `lit`
+* `name`: can be any string
+* `const`: specifies a constant value that is added to the instruction word (this can be used to change the instruction depending on which operand of the instruction `lit` is)
 
-Used for interrupts to save PCX (saved program counter) in register (e.g. `MOV R0, PCX`) and restore it (e.g. `MOV PCX, R0`)
+*What lit is used for in standard EEP1 instruction config?*
 
-`flags`:
+for interrupts to save
 
-* `type`: set to `flags`
-* `const`: same as for `pcx`
+* PCX (saved program counter) in register (e.g. `MOV R0, PCX`) and restore it (e.g. `MOV PCX, R0`)
+* flags in register (e.g. `MOV R0, Flags` and restore them (e.g. `MOV Flags, R0`).
 
-Used for interrupts to save flags in register (e.g. `MOV R0, Flags` and restore them (e.g. `MOV Flags, R0`).
 
 
 ### Built-in 2 operand shortcuts for 3 operand instructions
