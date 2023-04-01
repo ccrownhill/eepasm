@@ -36,10 +36,10 @@ bool optype_equal(const std::string& op, const std::string& type);
 
 uint16_t num_parse(const std::string& instr);
 
-uint16_t reg_parse(const std::string& reg_name, int size, int pc);
-uint16_t imm_parse(const std::string& imm_op, int size, int pc);
-uint16_t label_parse(const std::string& label, int size, int pc);
-uint16_t no_parse(const std::string& op, int size, int pc);
+uint16_t reg_parse(const std::string& reg_name, std::unordered_map<std::string, std::string> opfield_map, int pc);
+uint16_t imm_parse(const std::string& imm_op, std::unordered_map<std::string, std::string> opfield_map, int pc);
+uint16_t label_parse(const std::string& label, std::unordered_map<std::string, std::string> opfield_map, int pc);
+uint16_t no_parse(const std::string& op, std::unordered_map<std::string, std::string> opfield_map, int pc);
 
 
 insmap_t insmap_gen(const std::string& conf_file);
@@ -58,7 +58,7 @@ std::unordered_map<std::string, std::function<std::unordered_map<std::string, st
 	{"flags", const_opgen},
 };
 
-std::unordered_map<std::string, std::function<uint16_t(const std::string&, int, int)>> optype_fns {
+std::unordered_map<std::string, std::function<uint16_t(const std::string&, std::unordered_map<std::string, std::string>, int)>> optype_fns {
 	{"reg", reg_parse},
 	{"imm", imm_parse},
 	{"label", label_parse},
@@ -131,8 +131,6 @@ int main(int argc, char *argv[]) {
 		iword = insmap[tokens[0]].second;
 		if (ins_alts.size() != 0) {
 
-			int imm_size;
-			int numops;
 			int alt_idx = 0;
 			// skip to first instruction alternative with correct number
 			// of operands
@@ -177,21 +175,9 @@ int main(int argc, char *argv[]) {
 					}
 
 
-					// TODO make these functions that just accept the operand map as their parameters
-					// need to distinguish these cases because register operands have fixed size
-					if (ins_alts[alt_idx][alt_op]["type"] == "reg") {
-						iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], regsize, pc)
-							<< num_parse(ins_alts[alt_idx][alt_op]["lsb"]);
-					} else if (ins_alts[alt_idx][alt_op]["type"] == "imm") {
-						imm_size = num_parse(ins_alts[alt_idx][alt_op]["size"]);
-						iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], imm_size, pc)
-							<< num_parse(ins_alts[alt_idx][alt_op]["lsb"]);
-						iword += num_parse(ins_alts[alt_idx][alt_op]["ins8"]) << 8;
-					} else if (ins_alts[alt_idx][alt_op]["type"] == "label") {
-						iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], offset_size, pc);
-					} else if (ins_alts[alt_idx][alt_op]["type"] == "flags" || ins_alts[alt_idx][alt_op]["type"] == "pcx") {
-						iword += num_parse(ins_alts[alt_idx][alt_op]["const"]);
-					}
+					iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], ins_alts[alt_idx][alt_op], pc);
+
+
 					if (alt_op_skip) {
 						alt_op++;
 						alt_op_skip = false;
@@ -452,22 +438,24 @@ uint16_t num_parse(const std::string& instr) {
 	return num;
 }
 
-uint16_t reg_parse(const std::string& reg_name, int size, int pc) {
-	return reg_name[1] - '0';
+uint16_t reg_parse(const std::string& reg_name, std::unordered_map<std::string, std::string> opfield_map, int pc) {
+	return (reg_name[1] - '0') << num_parse(opfield_map["lsb"]);
 }
 
-uint16_t imm_parse(const std::string& imm_op, int size, int pc) {
-	uint16_t bitmask = (1 << size) - 1;
+uint16_t imm_parse(const std::string& imm_op, std::unordered_map<std::string, std::string> opfield_map, int pc) {
+	uint16_t bitmask = (1 << num_parse(opfield_map["size"])) - 1;
 	uint16_t num = num_parse(imm_op);
-	return num & bitmask;
+	num = (num & bitmask) << num_parse(opfield_map["lsb"]);
+	num += (num_parse(opfield_map["ins8"]) << 8);
+	return num;
 }
 
-uint16_t label_parse(const std::string& label, int size, int pc) {
+uint16_t label_parse(const std::string& label, std::unordered_map<std::string, std::string> opfield_map, int pc) {
 	if (label_map.find(label) == label_map.end())
 		error("assembly: label not found in program");
 	return (label_map[label] - static_cast<uint16_t>(pc)) & 0xff;
 }
 
-uint16_t no_parse(const std::string& instr, int size, int pc) {
+uint16_t no_parse(const std::string& instr, std::unordered_map<std::string, std::string> opfield_map, int pc) {
 	return 0;
 }
