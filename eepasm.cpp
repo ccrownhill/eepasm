@@ -33,15 +33,17 @@ void line_strip(std::string& line);
 std::pair<tokvec_t, labelmap_t> tokenize_file(std::ifstream& infile, const insmap_t& insmap);
 std::string ins2str(int pc, uint16_t iword);
 
-bool optype_equal(const std::string& op, const std::string& type);
-
 uint16_t num_parse(const std::string& instr);
 
-uint16_t reg_parse(const std::string& reg_name, std::unordered_map<std::string, std::string> opfield_map, int pc);
-uint16_t imm_parse(const std::string& imm_op, std::unordered_map<std::string, std::string> opfield_map, int pc);
-uint16_t label_parse(const std::string& label, std::unordered_map<std::string, std::string> opfield_map, int pc);
-uint16_t lit_parse(const std::string& op, std::unordered_map<std::string, std::string> opfield_map, int pc);
+uint16_t reg_parse(const std::string& reg_name, std::unordered_map<std::string, std::string>& opfield_map, int pc);
+uint16_t imm_parse(const std::string& imm_op, std::unordered_map<std::string, std::string>& opfield_map, int pc);
+uint16_t label_parse(const std::string& label, std::unordered_map<std::string, std::string>& opfield_map, int pc);
+uint16_t lit_parse(const std::string& op, std::unordered_map<std::string, std::string>& opfield_map, int pc);
 
+bool reg_check(const std::string& op, std::unordered_map<std::string, std::string>& opmap);
+bool imm_check(const std::string& op, std::unordered_map<std::string, std::string>& opmap);
+bool label_check(const std::string& op, std::unordered_map<std::string, std::string>& opmap);
+bool lit_check(const std::string& op, std::unordered_map<std::string, std::string>& opmap);
 
 insmap_t insmap_gen(const std::string& conf_file);
 oplist_t opvec_gen(std::ifstream& cfile, int numops);
@@ -49,6 +51,13 @@ std::unordered_map<std::string, std::string> reg_opgen(std::ifstream& cfile);
 std::unordered_map<std::string, std::string> imm_opgen(std::ifstream& cfile);
 std::unordered_map<std::string, std::string> lit_opgen(std::ifstream& cfile);
 std::unordered_map<std::string, std::string> no_opgen(std::ifstream& cfile);
+
+std::unordered_map<std::string, std::function<bool(const std::string&, std::unordered_map<std::string, std::string>&)>> optype_check_fns {
+	{"reg", reg_check},
+	{"imm", imm_check},
+	{"label", label_check},
+	{"lit", lit_check},
+};
 
 
 std::unordered_map<std::string, std::function<std::unordered_map<std::string, std::string>(std::ifstream&)>> opvec_gen_fns {
@@ -58,7 +67,7 @@ std::unordered_map<std::string, std::function<std::unordered_map<std::string, st
 	{"lit", lit_opgen},
 };
 
-std::unordered_map<std::string, std::function<uint16_t(const std::string&, std::unordered_map<std::string, std::string>, int)>> optype_fns {
+std::unordered_map<std::string, std::function<uint16_t(const std::string&, std::unordered_map<std::string, std::string>&, int)>> optype_fns {
 	{"reg", reg_parse},
 	{"imm", imm_parse},
 	{"label", label_parse},
@@ -135,8 +144,9 @@ int main(int argc, char *argv[]) {
 			// of operands
 			while (ins_alts[alt_idx].size() != tokens.size() - 1) {
 				alt_idx++;
-				if (alt_idx >= ins_alts.size())
+				if (alt_idx >= ins_alts.size()) {
 					error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
+				}
 			}
 			// select first alternative with matching number of operands
 			if (ins_alts[alt_idx].size() == tokens.size() - 1) {
@@ -153,7 +163,7 @@ int main(int argc, char *argv[]) {
 				bool alt_op_skip = false;
 				for (; tok_op < tokens.size(); tok_op++, alt_op++) {
 					// go to next alternative if current operand does not match requirement
-					while (!optype_equal(tokens[tok_op], ins_alts[alt_idx][alt_op]["type"])) {
+					while (!optype_check_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], ins_alts[alt_idx][alt_op])) {
 						alt_idx++;
 						if (alt_idx >= ins_alts.size()) {
 							error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
@@ -380,21 +390,22 @@ std::pair<tokvec_t, labelmap_t> tokenize_file(std::ifstream& infile, const insma
 	return make_pair(outvec, labelmap);
 }
 
-bool optype_equal(const std::string& op, const std::string& type) {
-	if (type == "reg") {
-		return (op[0] == 'r');
-	} else if (type == "imm") {
-		// last case to also make it work for negative numbers
-		return ((op[0] >= '0' && op[0] <= '9') || op[0] == '-');
-	} else if (type == "label") {
-		return true;
-	} else if (type == "lit") {
-		return true; // could be any string
-			     // lit_parse will check whether it is the correct string
-	} else {
-		return false; // if unknown type
-	}
+bool reg_check(const std::string& op, std::unordered_map<std::string, std::string>& opmap) {
+	return op[0] == 'r';
 }
+
+bool imm_check(const std::string& op, std::unordered_map<std::string, std::string>& opmap) {
+	return ((op[0] >= '0' && op[0] <= '9') || op[0] == '-');
+}
+
+bool label_check(const std::string& op, std::unordered_map<std::string, std::string>& opmap) {
+	return true;
+}
+
+bool lit_check(const std::string& op, std::unordered_map<std::string, std::string>& opmap) {
+	return (op == opmap["name"]);
+}
+
 
 void line_strip(std::string& line) {
 	int comment_start = line.find("//");
@@ -437,11 +448,11 @@ uint16_t num_parse(const std::string& instr) {
 	return num;
 }
 
-uint16_t reg_parse(const std::string& reg_name, std::unordered_map<std::string, std::string> opfield_map, int pc) {
+uint16_t reg_parse(const std::string& reg_name, std::unordered_map<std::string, std::string>& opfield_map, int pc) {
 	return (reg_name[1] - '0') << num_parse(opfield_map["lsb"]);
 }
 
-uint16_t imm_parse(const std::string& imm_op, std::unordered_map<std::string, std::string> opfield_map, int pc) {
+uint16_t imm_parse(const std::string& imm_op, std::unordered_map<std::string, std::string>& opfield_map, int pc) {
 	uint16_t bitmask = (1 << num_parse(opfield_map["size"])) - 1;
 	uint16_t num = num_parse(imm_op);
 	num = (num & bitmask) << num_parse(opfield_map["lsb"]);
@@ -449,12 +460,12 @@ uint16_t imm_parse(const std::string& imm_op, std::unordered_map<std::string, st
 	return num;
 }
 
-uint16_t label_parse(const std::string& label, std::unordered_map<std::string, std::string> opfield_map, int pc) {
+uint16_t label_parse(const std::string& label, std::unordered_map<std::string, std::string>& opfield_map, int pc) {
 	if (label_map.find(label) == label_map.end())
 		error("assembly: label not found in program");
 	return (label_map[label] - static_cast<uint16_t>(pc)) & 0xff;
 }
 
-uint16_t lit_parse(const std::string& label, std::unordered_map<std::string, std::string> opfield_map, int pc) {
+uint16_t lit_parse(const std::string& label, std::unordered_map<std::string, std::string>& opfield_map, int pc) {
 	return num_parse(opfield_map["const"]);
 }
