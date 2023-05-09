@@ -9,13 +9,7 @@ This is an alternative version of [Tom Clarke's EEP1 assembler](https://github.c
 ## Compilation
 
 ```
-clang++ eepasm.cpp -o eepasm
-```
-
-or
-
-```
-g++ eepasm.cpp -o eepasm
+make eepasm
 ```
 
 ## Command usage
