@@ -8,6 +8,7 @@
 #include <vector>
 #include <utility> // for pair
 #include <algorithm> // for transform
+#include <stdexcept>
 
 using oplist_t = std::vector<std::unordered_map<std::string, std::string>>;
 using insmap_t = std::unordered_map<std::string, std::pair<std::vector<oplist_t>, uint16_t>>;
@@ -24,8 +25,16 @@ std::pair<int, int> test;
 
 void usage();
 void error(const std::string& msg);
-void parsing_error(const std::string& msg, const std::string& insname);
-void assem_error(const std::string& msg, const std::string& insname, int line);
+
+class parsing_error : public std::runtime_error {
+public:
+	parsing_error(const std::string& what_arg) : std::runtime_error {what_arg} {}
+};
+
+class assem_error : public std::runtime_error {
+public:
+	assem_error(const std::string& what_arg) : std::runtime_error {what_arg} {}
+};
 
 std::string get_low_str(std::istream& infile);
 std::string get_cfile_val(std::ifstream& cfile, const std::string& field_name);
@@ -128,77 +137,81 @@ int main(int argc, char *argv[]) {
 	std::vector<oplist_t> ins_alts;
 	for (const auto& tokens : tok_vec) {
 		line++;
-		if (tokens[0] == "org") {
-			pc = num_parse(tokens[1]);
-			continue;
-		} else if (insmap.find(tokens[0]) == insmap.end()) {
-			error("line " + std::to_string(line) + ": unknown instruction '" + tokens[0] + "'");
-		}
-
-		ins_alts = insmap[tokens[0]].first;
-		iword = insmap[tokens[0]].second;
-		if (ins_alts.size() != 0) {
-
-			int alt_idx = 0;
-			// skip to first instruction alternative with correct number
-			// of operands
-			while (ins_alts[alt_idx].size() != tokens.size() - 1) {
-				alt_idx++;
-				if (alt_idx >= ins_alts.size()) {
-					error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
-				}
+		try {
+			if (tokens[0] == "org") {
+				pc = num_parse(tokens[1]);
+				continue;
+			} else if (insmap.find(tokens[0]) == insmap.end()) {
+				throw assem_error {"unknown instruction"};
 			}
-			// select first alternative with matching number of operands
-			if (ins_alts[alt_idx].size() == tokens.size() - 1) {
 
-				// these indexes can differ if a 2 operand shorthand
-				// of a 3 operand instruction is encountered:
-				// index of operand in current alternative
-				int alt_op = 0;
-				// index of operand in current tokens vector
-				int tok_op = 1; // starts at first operand in token vector
-				// needed to skip already processed Ra if we go back
-				// by one operand for Rc of 3 operand instruction
-				// with 2 operand shorthand
-				bool alt_op_skip = false;
-				for (; tok_op < tokens.size(); tok_op++, alt_op++) {
-					// go to next alternative if current operand does not match requirement
-					while (!optype_check_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], ins_alts[alt_idx][alt_op])) {
-						alt_idx++;
-						if (alt_idx >= ins_alts.size()) {
-							error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
-						}
-						if (ins_alts[alt_idx].size() > tokens.size() - 1) {
-							// try 3 operand instruction by duplicating first operand
-							if (ins_alts[alt_idx].size() == tokens.size()) {
-								tok_op--;
-								alt_op = tok_op - 1;
-								alt_op_skip = true;
-								if (tok_op == 0) {
-									error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
+			ins_alts = insmap[tokens[0]].first;
+			iword = insmap[tokens[0]].second;
+			if (ins_alts.size() != 0) {
+
+				int alt_idx = 0;
+				// skip to first instruction alternative with correct number
+				// of operands
+				while (ins_alts[alt_idx].size() != tokens.size() - 1) {
+					alt_idx++;
+					if (alt_idx >= ins_alts.size()) {
+						throw assem_error {"no matching version of instruction found"};
+					}
+				}
+				// select first alternative with matching number of operands
+				if (ins_alts[alt_idx].size() == tokens.size() - 1) {
+
+					// these indexes can differ if a 2 operand shorthand
+					// of a 3 operand instruction is encountered:
+					// index of operand in current alternative
+					int alt_op = 0;
+					// index of operand in current tokens vector
+					int tok_op = 1; // starts at first operand in token vector
+					// needed to skip already processed Ra if we go back
+					// by one operand for Rc of 3 operand instruction
+					// with 2 operand shorthand
+					bool alt_op_skip = false;
+					for (; tok_op < tokens.size(); tok_op++, alt_op++) {
+						// go to next alternative if current operand does not match requirement
+						while (!optype_check_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], ins_alts[alt_idx][alt_op])) {
+							alt_idx++;
+							if (alt_idx >= ins_alts.size()) {
+								throw assem_error {"no matching version of instruction found"};
+							}
+							if (ins_alts[alt_idx].size() > tokens.size() - 1) {
+								// try 3 operand instruction by duplicating first operand
+								if (ins_alts[alt_idx].size() == tokens.size()) {
+									tok_op--;
+									alt_op = tok_op - 1;
+									alt_op_skip = true;
+									if (tok_op == 0) {
+										throw assem_error {"no matching version of instruction found"};
+									}
+								} else {
+									throw assem_error {"no matching version of instruction found"};
 								}
-							} else {
-								error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
 							}
 						}
+
+
+						iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], ins_alts[alt_idx][alt_op], pc);
+
+
+						if (alt_op_skip) {
+							alt_op++;
+							alt_op_skip = false;
+						}
 					}
-
-
-					iword += optype_fns[ins_alts[alt_idx][alt_op]["type"]](tokens[tok_op], ins_alts[alt_idx][alt_op], pc);
-
-
-					if (alt_op_skip) {
-						alt_op++;
-						alt_op_skip = false;
-					}
+				} else {
+					throw assem_error {"no matching version of instruction found"};
 				}
-			} else {
-				error("line " + std::to_string(line) + ": no matching version of instruction '" + tokens[0] + "' found");
 			}
-		}
 
-		outfile << ins2str(pc, iword) << "\n";
-		pc++;
+			outfile << ins2str(pc, iword) << "\n";
+			pc++;
+		} catch (const assem_error& err) {
+			error("assembly instruction " + std::to_string(line) + " (" + tokens[0] + "): " + err.what());
+		}
 	}
  	outfile.close();
 }
@@ -210,16 +223,6 @@ void usage() {
 
 void error(const std::string& msg) {
 	std::cerr << "Error: " << msg << std::endl;
-	std::exit(EXIT_FAILURE);
-}
-
-void parsing_error(const std::string& msg, const std::string& insname) {
-	std::cerr << "Parsing (instruction: " << insname << "): " << msg << std::endl;
-	std::exit(EXIT_FAILURE);
-}
-
-void assem_error(const std::string& msg, const std::string& insname, int line) {
-	std::cerr << "Assemble line " << line << " (instruction: " << insname << "): " << msg << std::endl;
 	std::exit(EXIT_FAILURE);
 }
 
@@ -241,31 +244,35 @@ insmap_t insmap_gen(const std::string& conf_file) {
 	std::vector<oplist_t> alternatives_vec;
 	std::string ins_name, instr;
 	int numops;
-	int line = 0;
+
 	while ((ins_name = get_low_str(cfile)) != "") {
 		// process instructions stored in instr
 	
-		instr = get_low_str(cfile);
-		if (instr == "copy") {
-			outmap[ins_name].first = alternatives_vec;
+		try {
 			instr = get_low_str(cfile);
-		} else if (instr == "numops") {
-			alternatives_vec.clear();
-			while (instr == "numops") {
-				cfile >> numops; // numops value
-				if (numops > 3)
-					parsing_error("can't have more than 3 operands", ins_name);
-				alternatives_vec.push_back(opvec_gen(cfile, numops));
+			if (instr == "copy") {
+				outmap[ins_name].first = alternatives_vec;
 				instr = get_low_str(cfile);
+			} else if (instr == "numops") {
+				alternatives_vec.clear();
+				while (instr == "numops") {
+					cfile >> numops; // numops value
+					if (numops > 3)
+						throw parsing_error {"can't have more than 3 operands"};
+					alternatives_vec.push_back(opvec_gen(cfile, numops));
+					instr = get_low_str(cfile);
+				}
+				outmap[ins_name].first = alternatives_vec;
 			}
-			outmap[ins_name].first = alternatives_vec;
-		}
 
-		// while already read string const_iword
-		if (instr != "const_iword")
-			parsing_error("missing const_iword field", ins_name);
-		instr = get_low_str(cfile); // string of const_iword
-		outmap[ins_name].second = num_parse(instr);
+			// while already read string const_iword
+			if (instr != "const_iword")
+				throw parsing_error {"missing const_iword field"};
+			instr = get_low_str(cfile); // string of const_iword
+			outmap[ins_name].second = num_parse(instr);
+		} catch (const parsing_error& err) {
+			error("parsing (" + ins_name + "): " + err.what());
+		}
 	}
 
 	return outmap;
@@ -280,15 +287,15 @@ oplist_t opvec_gen(std::ifstream& cfile, int numops) {
 	for (int i = 0; i < numops; i++) {
 		instr = get_low_str(cfile);
 		if (instr != "op")
-			error("parsing: missing op indicator");
+			throw parsing_error {"missing op indicator"};
 
 		instr = get_low_str(cfile);
 		if (instr != "type")
-			error("parsing: type field missing");
+			throw parsing_error {"type field missing"};
 
 		type = get_low_str(cfile);
 		if (opvec_gen_fns.find(type) == opvec_gen_fns.end())
-			error("parsing: invaid operand type");
+			throw parsing_error {"invaid operand type"};
 
 		opfield_map = opvec_gen_fns[type](cfile);
 		opfield_map["type"] = type;
@@ -313,7 +320,7 @@ std::unordered_map<std::string, std::string> imm_opgen(std::ifstream& cfile) {
 	opfield_map["lsb"] = get_cfile_val(cfile, "lsb");
 	opfield_map["ins8"] = get_cfile_val(cfile, "ins8");
 	if (!(opfield_map["ins8"] == "0" || opfield_map["ins8"] == "1"))
-		error("parsing: ins8 value must be 0 or 1");
+		throw parsing_error {"ins8 value must be 0 or 1"};
 
 	return opfield_map;
 }
@@ -338,7 +345,7 @@ std::unordered_map<std::string, std::string> no_opgen(std::ifstream& cfile) {
 std::string get_cfile_val(std::ifstream& cfile, const std::string& field_name) {
 	std::string instr = get_low_str(cfile);
 	if (instr != field_name)
-		error("parsing: '" + field_name + "' field missing");
+		throw parsing_error {"'" + field_name + "' field missing"};
 	instr = get_low_str(cfile);
 	return instr;
 }
@@ -462,7 +469,7 @@ uint16_t imm_parse(const std::string& imm_op, std::unordered_map<std::string, st
 
 uint16_t label_parse(const std::string& label, std::unordered_map<std::string, std::string>& opfield_map, int pc) {
 	if (label_map.find(label) == label_map.end())
-		error("assembly: label not found in program");
+		throw assem_error {"label '" + label + "' not found in program"};
 	return (label_map[label] - static_cast<uint16_t>(pc)) & 0xff;
 }
 
